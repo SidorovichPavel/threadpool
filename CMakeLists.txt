@@ -13,7 +13,7 @@ include(GNUInstallDirs)
 
 string(COMPARE EQUAL "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}" is_top_level)
 
-# LIBTHREADPOOL_SHARED_LIBS option (undefined by default) can be used to force shared/static build
+option(LIBTHREADPOOL_SHARED_LIBS "can be used to force shared/static build" ON)
 option(LIBTHREADPOOL_BUILD_TESTS "Build libthreadpool tests" OFF)
 option(LIBTHREADPOOL_BUILD_EXAMPLES "Build libthreadpool examples" OFF)
 option(LIBTHREADPOOL_BUILD_DOCS "Build libthreadpool documentation" OFF)
