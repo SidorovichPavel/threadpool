@@ -84,7 +84,7 @@ set_property(TARGET libthreadpool PROPERTY CXX_STANDARD 23)
 
 if(libthreadpool_INSTALL AND NOT CMAKE_SKIP_INSTALL_RULES)
     configure_package_config_file(cmake/libthreadpool-config.cmake.in libthreadpool-config.cmake
-        INSTALL_DESTINATION "${libthreadpool_INSTALL_CMAKEDIR}")
+        INSTALL_DESTINATION "${LIBTHREADPOOL_INSTALL_CMAKEDIR}")
 
     write_basic_package_version_file(libthreadpool-config-version.cmake
         COMPATIBILITY SameMajorVersion)
@@ -110,14 +110,14 @@ if(libthreadpool_INSTALL AND NOT CMAKE_SKIP_INSTALL_RULES)
     install(EXPORT libthreadpool_export
         COMPONENT libthreadpool-dev
         FILE "${targets_file}"
-        DESTINATION "${libthreadpool_INSTALL_CMAKEDIR}"
+        DESTINATION "${LIBTHREADPOOL_INSTALL_CMAKEDIR}"
         NAMESPACE libthreadpool::)
 
     install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/libthreadpool-config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/libthreadpool-config-version.cmake"
         COMPONENT libthreadpool-dev
-        DESTINATION "${libthreadpool_INSTALL_CMAKEDIR}")
+        DESTINATION "${LIBTHREADPOOL_INSTALL_CMAKEDIR}")
 
     if(MSVC)
         set(pdb_file "")
