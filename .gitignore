@@ -1,25 +1,10 @@
 # Build folders
-build*/
-_build*/
-cmake-build*/
-CMakeFiles*/
+build/
 
 # CMake
-CMakeUserPresets.json
-cmake_install.cmake
 CMakeCache.txt
-
-# make
-Makefile
-
-#generated
-export_shared.h
-export_static.h
 
 # IDEs
 .idea/
 .vs/
 .vscode/
-
-# Mac
-.DS_Store
