@@ -18,7 +18,7 @@ namespace threadpool
         datapool(size_t threads_count, std::function<void(Args...)> task_func);
         ~datapool();
 
-        void enqueue(Args&&... args);
+        void enqueue(Args... args);
         void wait() noexcept;
     private:
         std::function<void(Args...)> task_;
@@ -72,7 +72,7 @@ namespace threadpool
     }
 
     template<class... Args>
-    void datapool<Args...>::enqueue(Args&&... args)
+    void datapool<Args...>::enqueue(Args... args)
     {
         std::unique_lock<std::mutex> locker(queue_mutex_);
         data_queue_.emplace(args...);
