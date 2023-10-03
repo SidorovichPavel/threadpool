@@ -17,7 +17,7 @@ namespace threadpool
     class threadpool final
     {
     public:
-        threadpool(int _Count);
+        threadpool(size_t _Count);
         ~threadpool();
 
         template <class Fn, class Obj, class... Args>

@@ -5,10 +5,10 @@
 
 namespace threadpool {
 
-    threadpool::threadpool(int threads_count)
+    threadpool::threadpool(size_t threads_count)
         : stop_pool(false)
     {
-        for (auto i = 0; i < threads_count; ++i)
+        for (size_t i = 0; i < threads_count; ++i)
             workers_.emplace_back(std::thread([this]() {
             for (;;) {
                 std::function<void()> task;
