@@ -13,6 +13,8 @@
 
 namespace threadpool
 {
+    template<class T>
+    concept Pointer = std::is_pointer<T>::value;
 
     class threadpool final
     {
@@ -20,8 +22,8 @@ namespace threadpool
         threadpool(size_t _Count);
         ~threadpool();
 
-        template <class Fn, class Obj, class... Args>
-        auto enqueue(Fn&& fn, Obj&& obj, Args &&...args)
+        template <class Fn, Pointer Obj, class... Args>
+        auto enqueue(Fn&& fn, Obj obj, Args &&...args)
             -> std::future<decltype((obj->*fn)(std::forward<Args>(args)...))>;
 
         template <class Fn, class... Args>
@@ -36,8 +38,8 @@ namespace threadpool
         std::vector<std::thread> workers_;
     };
 
-    template <class Fn, class Obj, class... Args>
-    auto threadpool::enqueue(Fn&& fn, Obj&& obj, Args &&...args)
+    template <class Fn, Pointer Obj, class... Args>
+    auto threadpool::enqueue(Fn&& fn, Obj obj, Args&&...args)
         -> std::future<decltype((obj->*fn)(std::forward<Args>(args)...))>
     {
         using ret_t = decltype((obj->*fn)(std::forward<Args>(args)...));
@@ -55,7 +57,7 @@ namespace threadpool
             (*pTask)();
             delete pTask;
             });
-        
+
         locker.unlock();
         condition_.notify_one();
         return res;
