@@ -5,7 +5,7 @@
 
 namespace threadpool {
 
-ThreadPool::ThreadPool(int threads_count): stop_pool(false)
+threadpool::threadpool(int threads_count): stop_pool(false)
 {
     for (auto i = 0; i < threads_count; ++i)
         workers_.emplace_back(std::thread([this]() {
@@ -26,7 +26,7 @@ ThreadPool::ThreadPool(int threads_count): stop_pool(false)
         }));
 }
 
-ThreadPool::~ThreadPool()
+threadpool::~threadpool()
 {
     std::unique_lock<std::mutex> locker(queue_mutex_);
     stop_pool = true;

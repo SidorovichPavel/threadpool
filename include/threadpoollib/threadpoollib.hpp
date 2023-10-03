@@ -7,13 +7,16 @@
 #include <queue>
 #include <thread>
 #include <vector>
+#include <concepts>
+
+#include "datapool.hpp"
 
 namespace threadpool {
 
-class ThreadPool final {
+class threadpool final {
 public:
-    ThreadPool(int _Count);
-    ~ThreadPool();
+    threadpool(int _Count);
+    ~threadpool();
 
     template<class Fn, class Obj, class... Args>
     auto enqueue(Fn&& fn, Obj&& obj, Args&&... args)
@@ -32,7 +35,7 @@ private:
 };
 
 template<class Fn, class Obj, class... Args>
-auto ThreadPool::enqueue(Fn&& fn, Obj&& obj, Args&&... args)
+auto threadpool::enqueue(Fn&& fn, Obj&& obj, Args&&... args)
     -> std::future<decltype((obj->*fn)(std::forward<Args>(args)...))>
 {
     using ret_t = decltype((obj->*fn)(std::forward<Args>(args)...));
@@ -56,7 +59,7 @@ auto ThreadPool::enqueue(Fn&& fn, Obj&& obj, Args&&... args)
 }
 
 template<class Fn, class... Args>
-auto ThreadPool::enqueue(Fn&& fn, Args&&... args)
+auto threadpool::enqueue(Fn&& fn, Args&&... args)
     -> std::future<decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...))>
 {
     using ret_t = decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...));
