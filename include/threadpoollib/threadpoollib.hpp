@@ -21,11 +21,11 @@ namespace threadpool
         ~threadpool();
 
         template <class Fn, class Obj, class... Args>
-        auto enqueue(Fn &&fn, Obj &&obj, Args &&...args)
+        auto enqueue(Fn&& fn, Obj&& obj, Args &&...args)
             -> std::future<decltype((obj->*fn)(std::forward<Args>(args)...))>;
 
         template <class Fn, class... Args>
-        auto enqueue(Fn &&fn, Args &&...args) -> std::future<decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...))>;
+        auto enqueue(Fn&& fn, Args &&...args) -> std::future<decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...))>;
 
     private:
         std::mutex queue_mutex_;
@@ -37,7 +37,7 @@ namespace threadpool
     };
 
     template <class Fn, class Obj, class... Args>
-    auto threadpool::enqueue(Fn &&fn, Obj &&obj, Args &&...args)
+    auto threadpool::enqueue(Fn&& fn, Obj&& obj, Args &&...args)
         -> std::future<decltype((obj->*fn)(std::forward<Args>(args)...))>
     {
         using ret_t = decltype((obj->*fn)(std::forward<Args>(args)...));
@@ -51,17 +51,18 @@ namespace threadpool
         if (stop_pool)
             throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
 
-        tasks_.emplace([pTask]
-                       {
-        (*pTask)();
-        delete pTask; });
+        tasks_.emplace([pTask] {
+            (*pTask)();
+            delete pTask;
+            });
+        
         locker.unlock();
         condition_.notify_one();
         return res;
     }
 
     template <class Fn, class... Args>
-    auto threadpool::enqueue(Fn &&fn, Args &&...args)
+    auto threadpool::enqueue(Fn&& fn, Args &&...args)
         -> std::future<decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...))>
     {
         using ret_t = decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...));
@@ -75,9 +76,9 @@ namespace threadpool
             throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
 
         tasks_.emplace([pTask]
-                       {
-        (*pTask)();
-        delete pTask; });
+            {
+                (*pTask)();
+                delete pTask; });
 
         locker.unlock();
         condition_.notify_one();

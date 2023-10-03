@@ -5,10 +5,11 @@
 
 namespace threadpool {
 
-threadpool::threadpool(int threads_count): stop_pool(false)
-{
-    for (auto i = 0; i < threads_count; ++i)
-        workers_.emplace_back(std::thread([this]() {
+    threadpool::threadpool(int threads_count)
+        : stop_pool(false)
+    {
+        for (auto i = 0; i < threads_count; ++i)
+            workers_.emplace_back(std::thread([this]() {
             for (;;) {
                 std::function<void()> task;
 
@@ -23,18 +24,18 @@ threadpool::threadpool(int threads_count): stop_pool(false)
 
                 task();
             }
-        }));
-}
+                }));
+    }
 
-threadpool::~threadpool()
-{
-    std::unique_lock<std::mutex> locker(queue_mutex_);
-    stop_pool = true;
-    locker.unlock();
+    threadpool::~threadpool()
+    {
+        std::unique_lock<std::mutex> locker(queue_mutex_);
+        stop_pool = true;
+        locker.unlock();
 
-    condition_.notify_all();
-    for (auto& thread: workers_)
-        thread.join();
-}
+        condition_.notify_all();
+        for (auto& thread : workers_)
+            thread.join();
+    }
 
 } // namespace threadpool
