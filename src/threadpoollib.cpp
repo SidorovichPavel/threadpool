@@ -6,31 +6,32 @@
 namespace threadpool {
 
     threadpool::threadpool(size_t threads_count)
-        : stop_pool(false)
+        :
+        stop_pool_(false)
     {
         for (size_t i = 0; i < threads_count; ++i)
-            workers_.emplace_back(std::thread([this]() {
-            for (;;) {
-                std::function<void()> task;
+            workers_.emplace_back(std::thread([this]()
+                {
+                    for (;;) {
+                        std::function<void()> task;
+                        {
+                            std::unique_lock<std::mutex> locker(queue_mutex_);
+                            condition_.wait(locker, [this] { return !tasks_.empty() || stop_pool_; });
+                            if (stop_pool_ && tasks_.empty())
+                                return;
 
-                std::unique_lock<std::mutex> locker(queue_mutex_);
-                condition_.wait(locker, [this] { return !tasks_.empty() || stop_pool; });
-                if (stop_pool && tasks_.empty())
-                    return;
-
-                task = std::move(tasks_.front());
-                tasks_.pop();
-                locker.unlock();
-
-                task();
-            }
+                            task = std::move(tasks_.front());
+                            tasks_.pop();
+                        }
+                        task();
+                    }
                 }));
     }
 
     threadpool::~threadpool()
     {
         std::unique_lock<std::mutex> locker(queue_mutex_);
-        stop_pool = true;
+        stop_pool_ = true;
         locker.unlock();
 
         condition_.notify_all();

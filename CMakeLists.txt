@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(threadpoollib VERSION 0.1.8 LANGUAGES C CXX)
+project(threadpoollib VERSION 0.2.0 LANGUAGES C CXX)
 
 set(SOURCES
     src/threadpoollib.cpp

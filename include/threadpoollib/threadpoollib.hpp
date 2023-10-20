@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 #include <concepts>
+#include <type_traits>
 
 #include "datapool.hpp"
 
@@ -16,76 +17,152 @@ namespace threadpool
     template<class T>
     concept Pointer = std::is_pointer<T>::value;
 
+    template <typename Iter>
+    concept RandomAccessIterator = requires(Iter it) {
+        { it + 1 } -> std::same_as<Iter>;
+        { it - 1 } -> std::same_as<Iter>;
+        { it += 1 } -> std::same_as<Iter&>;
+        { it -= 1 } -> std::same_as<Iter&>;
+        { it - it } -> std::convertible_to<std::ptrdiff_t>;
+        { it + std::ptrdiff_t(1) } -> std::same_as<Iter>;
+        { std::distance(it, it) } -> std::same_as<std::ptrdiff_t>;
+    };
+
+    template<class Container, class Callable>
+    concept CallableWithArgs = requires (Callable callable, Container container)
+    {
+        { callable(*container.begin()) };
+    };
+
+    template<class Container, class ResIter, class Callable>
+    concept TransformWithArgs = requires (Container container, ResIter result, Callable callable)
+    {
+        { *result = callable(*container.begin()) };
+    };
+
     class threadpool final
     {
     public:
-        threadpool(size_t _Count);
+        threadpool(size_t threads_count);
         ~threadpool();
 
-        template <class Fn, Pointer Obj, class... Args>
-        auto enqueue(Fn&& fn, Obj obj, Args &&...args)
-            -> std::future<decltype((obj->*fn)(std::forward<Args>(args)...))>;
-
         template <class Fn, class... Args>
-        auto enqueue(Fn&& fn, Args &&...args) -> std::future<decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...))>;
+        std::future<std::invoke_result_t<Fn, Args...>> enqueue(Fn&& fn, Args &&...args);
+
+        template<std::ranges::range Range, class Callable>
+        void for_each(Range&& range, Callable&& fn);
+
+        template<std::ranges::range Range, RandomAccessIterator ResIter, class Callable>
+        void transform(Range&& range, ResIter result, Callable&& fn);
 
     private:
+
         std::mutex queue_mutex_;
         std::queue<std::function<void(void)>> tasks_;
         std::condition_variable condition_;
-        bool stop_pool;
+        bool stop_pool_;
 
         std::vector<std::thread> workers_;
     };
 
-    template <class Fn, Pointer Obj, class... Args>
-    auto threadpool::enqueue(Fn&& fn, Obj obj, Args&&...args)
-        -> std::future<decltype((obj->*fn)(std::forward<Args>(args)...))>
-    {
-        using ret_t = decltype((obj->*fn)(std::forward<Args>(args)...));
-
-        auto pTask = new std::packaged_task<ret_t()>(
-            std::bind(std::forward<Fn>(fn), std::forward<Obj>(obj), std::forward<Args>(args)...));
-
-        std::future<ret_t> res = pTask->get_future();
-
-        std::unique_lock<std::mutex> locker(queue_mutex_);
-        if (stop_pool)
-            throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
-
-        tasks_.emplace([pTask] {
-            (*pTask)();
-            delete pTask;
-            });
-
-        locker.unlock();
-        condition_.notify_one();
-        return res;
-    }
-
     template <class Fn, class... Args>
-    auto threadpool::enqueue(Fn&& fn, Args &&...args)
-        -> std::future<decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...))>
+    std::future<std::invoke_result_t<Fn, Args...>> threadpool::enqueue(Fn&& fn, Args &&...args)
     {
-        using ret_t = decltype(std::forward<Fn>(fn)(std::forward<Args>(args)...));
+        using invoke_result_t = std::invoke_result_t<Fn, Args...>;
 
-        auto pTask = new std::packaged_task<ret_t()>(std::bind(std::forward<Fn>(fn), std::forward<Args>(args)...));
+        auto pTask = new std::packaged_task<invoke_result_t()>(std::bind(std::forward<Fn>(fn), std::forward<Args>(args)...));
 
-        std::future<ret_t> res = pTask->get_future();
+        std::future<invoke_result_t> res = pTask->get_future();
 
         std::unique_lock<std::mutex> locker(queue_mutex_);
-        if (stop_pool)
+        if (stop_pool_)
             throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
 
         tasks_.emplace([pTask]
             {
                 (*pTask)();
-                delete pTask; });
+                delete pTask;
+            });
 
         locker.unlock();
         condition_.notify_one();
 
         return res;
+    }
+
+    template<std::ranges::range Range, class Callable>
+    void threadpool::for_each(Range&& range, Callable&& fn)
+    {
+        static_assert(CallableWithArgs<Range, Callable>, "Callable must be invocable with Conteiner::value_type[&|&&] Args.");
+
+        size_t chunk_count = std::thread::hardware_concurrency();
+        size_t chunk_size = range.size() / chunk_count;
+
+        auto chunks = range | std::views::chunk(chunk_size);
+        std::atomic<size_t> counter = chunks.size();
+        std::mutex task_mutex;
+        std::condition_variable done;
+
+        {
+            std::unique_lock<std::mutex> locker(queue_mutex_);
+            if (stop_pool_)
+                throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
+
+            for (auto&& chunk : chunks)
+            {
+                tasks_.emplace([&]
+                    {
+                        std::ranges::for_each(chunk, fn);
+
+                        std::unique_lock<std::mutex> lock(task_mutex);
+                        counter--;
+                        done.notify_one();
+                    });
+            }
+        }
+        condition_.notify_all();
+
+        std::unique_lock<std::mutex> lock(task_mutex);
+        done.wait(lock, [&] {return counter == 0;});
+    }
+
+    template<std::ranges::range Range, RandomAccessIterator ResIter, class Callable>
+    void threadpool::transform(Range&& range, ResIter result, Callable&& fn)
+    {
+        static_assert(TransformWithArgs<Range, ResIter, Callable>, "Callable must be invocable with Conteiner::value_type[&|&&] Args.");
+
+        size_t chunk_count = std::thread::hardware_concurrency();
+        size_t chunk_size = range.size() / chunk_count;
+
+        auto chunks = range | std::views::chunk(chunk_size);
+
+        std::atomic<size_t> counter = chunks.size();
+        std::mutex task_mutex;
+        std::condition_variable done;
+        auto transform = [&](auto&& range, auto iter)
+            {
+                std::ranges::transform(range, iter, fn);
+                std::unique_lock<std::mutex> lock(task_mutex);
+                counter--;
+                done.notify_one();
+            };
+
+        {
+            std::unique_lock<std::mutex> locker(queue_mutex_);
+            if (stop_pool_)
+                throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
+
+            auto res = result;
+            for (auto&& chunk : chunks)
+            {
+                tasks_.emplace(std::bind(transform, chunk, res));
+                res += chunk_size;
+            }
+        }
+        condition_.notify_all();
+
+        std::unique_lock<std::mutex> lock(task_mutex);
+        done.wait(lock, [&] {return counter == 0;});
     }
 
 } // namespace threadpool
