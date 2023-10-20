@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <ranges>
 
-#include <threadpoollib/threadpoollib.hpp>
+#include <threadpoollib/threadpool.hpp>
 
 namespace threadpool {
 

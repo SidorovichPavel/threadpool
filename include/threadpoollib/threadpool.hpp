@@ -10,8 +10,6 @@
 #include <concepts>
 #include <type_traits>
 
-#include "datapool.hpp"
-
 namespace threadpool
 {
     template<class T>
@@ -29,15 +27,21 @@ namespace threadpool
     };
 
     template<class Container, class Callable>
-    concept CallableWithArgs = requires (Callable callable, Container container)
+    concept CallableWithValue = requires (Callable callable, Container container)
     {
         { callable(*container.begin()) };
     };
 
     template<class Container, class ResIter, class Callable>
-    concept TransformWithArgs = requires (Container container, ResIter result, Callable callable)
+    concept UnaryTransform = requires (Container container, ResIter result, Callable callable)
     {
         { *result = callable(*container.begin()) };
+    };
+
+    template<class Conteiner, class Iter, class ResIter, class Callable>
+    concept BinaryTransform = requires (Conteiner conteiner, Iter iter, ResIter result, Callable callable)
+    {
+        { *result = callable(*conteiner.begin(), *iter) };
     };
 
     class threadpool final
@@ -55,6 +59,8 @@ namespace threadpool
         template<std::ranges::range Range, RandomAccessIterator ResIter, class Callable>
         void transform(Range&& range, ResIter result, Callable&& fn);
 
+        template<std::ranges::range Range, RandomAccessIterator Iter, RandomAccessIterator ResIter, class Callback>
+        void transform(Range&& range, Iter&& iter, ResIter&& result, Callback&& fn);
     private:
 
         std::mutex queue_mutex_;
@@ -93,7 +99,7 @@ namespace threadpool
     template<std::ranges::range Range, class Callable>
     void threadpool::for_each(Range&& range, Callable&& fn)
     {
-        static_assert(CallableWithArgs<Range, Callable>, "Callable must be invocable with Conteiner::value_type[&|&&] Args.");
+        static_assert(CallableWithValue<Range, Callable>, "Callable must be invocable with Conteiner::value_type.");
 
         size_t chunk_count = std::thread::hardware_concurrency();
         size_t chunk_size = range.size() / chunk_count;
@@ -129,7 +135,7 @@ namespace threadpool
     template<std::ranges::range Range, RandomAccessIterator ResIter, class Callable>
     void threadpool::transform(Range&& range, ResIter result, Callable&& fn)
     {
-        static_assert(TransformWithArgs<Range, ResIter, Callable>, "Callable must be invocable with Conteiner::value_type[&|&&] Args.");
+        static_assert(UnaryTransform<Range, ResIter, Callable>, "Callable must be compile. *result = fn(*range.begin()) must be correct");
 
         size_t chunk_count = std::thread::hardware_concurrency();
         size_t chunk_size = range.size() / chunk_count;
@@ -157,6 +163,47 @@ namespace threadpool
             {
                 tasks_.emplace(std::bind(transform, chunk, res));
                 res += chunk_size;
+            }
+        }
+        condition_.notify_all();
+
+        std::unique_lock<std::mutex> lock(task_mutex);
+        done.wait(lock, [&] {return counter == 0;});
+    }
+
+    template<std::ranges::range Range, RandomAccessIterator Iter, RandomAccessIterator ResIter, class Callable>
+    void threadpool::transform(Range&& range, Iter&& iter, ResIter&& result, Callable&& fn)
+    {
+        static_assert(UnaryTransform<Range, Iter, ResIter, Callable>, "Callable must be compile. *result = fn(*range.begin(), *iter) must be correct");
+
+        size_t chunk_count = std::thread::hardware_concurrency();
+        size_t chunk_size = range.size() / chunk_count;
+
+        auto chunks = range | std::views::chunk(chunk_size);
+
+        std::atomic<size_t> counter = chunks.size();
+        std::mutex task_mutex;
+        std::condition_variable done;
+        auto transform = [&](auto&& range, auto iter, auto res_iter)
+            {
+                std::ranges::transform(range, iter, res_iter, fn);
+                std::unique_lock<std::mutex> lock(task_mutex);
+                counter--;
+                done.notify_one();
+            };
+
+        {
+            std::unique_lock<std::mutex> locker(queue_mutex_);
+            if (stop_pool_)
+                throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
+
+            auto res = result;
+            auto it = iter;
+            for (auto&& chunk : chunks)
+            {
+                tasks_.emplace(std::bind(transform, chunk, it, res));
+                res += chunk_size;
+                it += chunk_size;
             }
         }
         condition_.notify_all();

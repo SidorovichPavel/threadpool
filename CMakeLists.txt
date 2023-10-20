@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 project(threadpoollib VERSION 0.2.0 LANGUAGES C CXX)
 
 set(SOURCES
-    src/threadpoollib.cpp
+    src/threadpool.cpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES})
