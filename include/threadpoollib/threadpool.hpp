@@ -101,21 +101,24 @@ namespace threadpool
     {
         using invoke_result_t = std::invoke_result_t<Fn, Args...>;
 
-        auto pTask = new std::packaged_task<invoke_result_t()>(std::bind(std::forward<Fn>(fn), std::forward<Args>(args)...));
-
-        std::future<invoke_result_t> res = pTask->get_future();
-
-        std::unique_lock<std::mutex> locker(queue_mutex_);
-        if (stop_pool_)
-            throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
-
-        tasks_.emplace([pTask]
-            {
-                (*pTask)();
-                delete pTask;
+        auto pTask = new std::packaged_task<invoke_result_t()>(
+            [fn = std::forward<Fn>(fn), ... args = std::forward<Args>(args)] mutable {
+                return fn(args...);
             });
 
-        locker.unlock();
+        std::future<invoke_result_t> res = pTask->get_future();
+        {
+            std::unique_lock<std::mutex> locker(queue_mutex_);
+            if (stop_pool_)
+                throw std::runtime_error("ThreadPull, push task failed. How did you do it?");
+
+            tasks_.emplace([pTask]
+                {
+                    (*pTask)();
+                    delete pTask;
+                });
+
+        }
         condition_.notify_one();
 
         return res;
