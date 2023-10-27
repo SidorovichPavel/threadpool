@@ -97,7 +97,7 @@ namespace threadpool
     };
 
     template <class Fn, class... Args>
-    std::future<std::invoke_result_t<Fn, Args...>> threadpool::enqueue(Fn&& fn, Args &&...args)
+    std::future<std::invoke_result_t<Fn, Args...>> threadpool::enqueue(Fn&& fn, Args&&...args)
     {
         using invoke_result_t = std::invoke_result_t<Fn, Args...>;
 
@@ -278,4 +278,4 @@ namespace threadpool
         done.wait(lock, [&] {return counter == 0;});
     }
 
-    } // namespace threadpool
+} // namespace threadpool
