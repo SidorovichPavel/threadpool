@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <ranges>
 
-#include <threadpoollib/threadpool.hpp>
+#include <threadpool/threadpool.hpp>
 
 namespace threadpool {
 
@@ -13,7 +13,7 @@ namespace threadpool {
             workers_.emplace_back(std::thread([this]()
                 {
                     for (;;) {
-                        std::function<void()> task;
+                        std::move_only_function<void()> task;
                         {
                             std::unique_lock<std::mutex> locker(queue_mutex_);
                             condition_.wait(locker, [this] { return !tasks_.empty() || stop_pool_; });
@@ -30,9 +30,10 @@ namespace threadpool {
 
     threadpool::~threadpool()
     {
-        std::unique_lock<std::mutex> locker(queue_mutex_);
-        stop_pool_ = true;
-        locker.unlock();
+        {
+            std::lock_guard<std::mutex> locker(queue_mutex_);
+            stop_pool_ = true;
+        }
 
         condition_.notify_all();
         for (auto& thread : workers_)
