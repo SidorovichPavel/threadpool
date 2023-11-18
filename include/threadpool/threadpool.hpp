@@ -40,20 +40,18 @@ namespace threadpool
         using invoke_result_t = std::invoke_result_t<Fn, Args...>;
 
         auto pTask = std::make_unique<std::packaged_task<invoke_result_t()>>(
-            [&fn, &args...]() mutable -> invoke_result_t
-            {
+            [fn = std::forward<Fn>(fn), ...args = std::forward<Args>(args)]() mutable -> invoke_result_t {
                 return std::invoke(std::forward<Fn>(fn), std::forward<Args>(args)...);
             });
 
         std::future<invoke_result_t> res = pTask->get_future();
         {
-            std::unique_lock<std::mutex> locker(queue_mutex_);
+            std::lock_guard<std::mutex> locker(queue_mutex_);
             if (stop_pool_)
                 throw std::runtime_error("ThreadPool, push task failed. How did you do it?");
 
-            tasks_.emplace([utask = std::move(pTask)]
-                {
-                    (*utask)();
+            tasks_.emplace([utask = std::move(pTask)] {
+                (*utask)();
                 });
 
         }
