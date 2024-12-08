@@ -1,13 +1,11 @@
 #pragma once
 
 #include <algorithm>
-#include <concepts>
 #include <condition_variable>
 #include <functional>
 #include <future>
 #include <mutex>
 #include <queue>
-#include <ranges>
 #include <thread>
 #include <type_traits>
 #include <vector>
@@ -16,7 +14,7 @@ namespace threadpool {
 
 class threadpool final {
  public:
-  threadpool(size_t threads_count);
+  explicit threadpool(size_t threads_count);
   ~threadpool();
 
   template <class Fn, class... Args>
