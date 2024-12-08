@@ -16,5 +16,4 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/in
 
 export(TARGETS ${PROJECT_NAME} FILE ${CMAKE_BINARY_DIR}/${PROJECT_NAME}.cmake)
 
-add_executable(threadpool_test tests/test.cpp)
-target_link_libraries(threadpool_test threadpool)
+add_subdirectory(tests)
