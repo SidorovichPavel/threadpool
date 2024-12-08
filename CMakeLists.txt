@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.28)
 
 project(threadpool VERSION 0.2.0 LANGUAGES C CXX)
 
